@@ -1,5 +1,6 @@
 #define SDL_MAIN_HANDLED
-#include <SDL2/SDL.h>
+#include <SDL.h>
+#include <SDL_ttf.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -162,8 +163,57 @@ int check_self_collision(SnakeElement *psnake, int targetX, int targetY) {
     return 0; // No collision
 }
 
+void render_text(SDL_Renderer* renderer, TTF_Font* font, const char* text, int x, int y) {
+    SDL_Color color = {255, 255, 255, 255}; // White color
+    SDL_Surface* surface = TTF_RenderText_Solid(font, text, color);
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    
+    SDL_Rect dest = {x, y, surface->w, surface->h};
+    SDL_RenderCopy(renderer, texture, NULL, &dest);
+    
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(texture);
+}
+void free_snake(SnakeElement *psnake) {
+    while (psnake != NULL) {
+        SnakeElement *temp = psnake;
+        psnake = psnake->pnext;
+        free(temp);
+    }
+}
+
+// Call this to reset the game state
+void reset_game(SnakeElement **psnake, int *score, Direction *dir, Apple *apple) {
+    free_snake(*psnake);
+    
+    // Re-create starting snake (3 segments)
+    *psnake = malloc(sizeof(SnakeElement));
+    (*psnake)->x = 5; (*psnake)->y = 5;
+    
+    SnakeElement *body = malloc(sizeof(SnakeElement));
+    body->x = 4; body->y = 5;
+    
+    SnakeElement *tail = malloc(sizeof(SnakeElement));
+    tail->x = 3; tail->y = 5;
+    
+    (*psnake)->pnext = body;
+    body->pnext = tail;
+    tail->pnext = NULL;
+    
+    *score = 0;
+    dir->dx = 1; dir->dy = 0;
+    reset_apple(*psnake, apple);
+}
+
 int main(){
     SDL_Init(SDL_INIT_VIDEO);
+    TTF_Init();
+    
+    
+
+    // Load font
+    TTF_Font* font = TTF_OpenFont("ARIAL.TTF", 24); // 24 is the font size
+   
 
     SDL_Window *window = SDL_CreateWindow(
         "Snake Game",
@@ -184,6 +234,7 @@ int main(){
     Apple apple;
     Apple *papple = &apple;
     //Snake er First Coordinate
+    // 1. Create the head
     SnakeElement *psnake = malloc(sizeof(SnakeElement));
     if (psnake == NULL) {
         printf("Out of memory!\n");
@@ -191,35 +242,58 @@ int main(){
     }
     psnake->x = 5;
     psnake->y = 5;
-    psnake->pnext = NULL;
+
+    // 2. Create the second segment (placed one cell to the left)
+    SnakeElement *body = malloc(sizeof(SnakeElement));
+    body->x = 4;
+    body->y = 5;
+
+    // 3. Create the third segment (placed two cells to the left)
+    SnakeElement *tail = malloc(sizeof(SnakeElement));
+    tail->x = 3;
+    tail->y = 5;
+
+    // 4. Link them all together: Head -> Body -> Tail -> NULL
+    psnake->pnext = body;
+    body->pnext = tail;
+    tail->pnext = NULL;
     reset_apple(psnake, papple);
 
     int game = 1;
-    int score = 0;             // --- NEW: Track the player score ---
-    char title_buffer[64];     // --- NEW: Buffer to hold title string ---
+    int score = 0; 
+    int is_game_over=0;           
+    char title_buffer[64];    
 
-    while(game){
-        
-        while(SDL_PollEvent(&event)){
-            if(event.type == SDL_QUIT)
-                game = 0;
-                
-            if(event.type == SDL_KEYDOWN){
-                if(event.key.keysym.sym == SDLK_RIGHT && direction.dx != -1){
-                    direction.dx = 1;
-                    direction.dy = 0;
+   while(game) {
+        // 1. EVENT HANDLING
+        while(SDL_PollEvent(&event)) {
+            if(event.type == SDL_QUIT) game = 0;
+
+            if(is_game_over) {
+                // If game is over, only listen for 'R'
+                if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r) {
+                    reset_game(&psnake, &score, &direction, papple);
+                    is_game_over = 0;
                 }
-                else if(event.key.keysym.sym == SDLK_LEFT && direction.dx != 1){
-                    direction.dx = -1;
-                    direction.dy = 0;
-                }
-                else if(event.key.keysym.sym == SDLK_UP && direction.dy != 1){
-                    direction.dx = 0;
-                    direction.dy = -1;
-                }
-                else if(event.key.keysym.sym == SDLK_DOWN && direction.dy != -1){
-                    direction.dx = 0;
-                    direction.dy = 1;
+            } else {
+                // Listen for movement
+                if(event.type == SDL_KEYDOWN) {
+                    if(event.key.keysym.sym == SDLK_RIGHT && direction.dx != -1) { 
+                        direction.dx = 1; 
+                        direction.dy = 0; 
+                    }
+                    else if(event.key.keysym.sym == SDLK_LEFT && direction.dx != 1) { 
+                        direction.dx = -1; 
+                        direction.dy = 0; 
+                    }
+                    else if(event.key.keysym.sym == SDLK_UP && direction.dy != 1) { 
+                        direction.dx = 0; 
+                        direction.dy = -1; 
+                    }
+                    else if(event.key.keysym.sym == SDLK_DOWN && direction.dy != -1) { 
+                        direction.dx = 0; 
+                        direction.dy = 1; 
+                    }
                 }
             }
         }
@@ -235,49 +309,45 @@ int main(){
         int nextX = psnake->x + direction.dx;
         int nextY = psnake->y + direction.dy;
 
-        // --- NEW: COLLISION CHECKS ---
-        // 1. Check if snake hit the wall 
-        if (nextX < 0 || nextX >= COLS || nextY < 0 || nextY >= ROWS) {
-            printf("Game Over! You hit the wall.\n");
-            game = 0; // Break the game loop
-            continue; // Skip the rest of this frame
+        // 2. GAME LOGIC
+        if(!is_game_over) {
+            int nextX = psnake->x + direction.dx;
+            int nextY = psnake->y + direction.dy;
+
+            if (nextX < 0 || nextX >= COLS || nextY < 0 || nextY >= ROWS || check_self_collision(psnake, nextX, nextY)) {
+                is_game_over = 1;
+            } else {
+                if(nextX == papple->x && nextY == papple->y) {
+                    grow_snake(&psnake, &direction);
+                    reset_apple(psnake, papple);
+                    score += 10;
+                } else {
+                    move_snake(&psnake, &direction);
+                }
+            }
+        }
+        
+        if(is_game_over) {
+            render_text(renderer, font, "GAME OVER - Press R to Restart", 80, 200);
+        } else {
+            APPLE(papple->x, papple->y);
+            draw_snake(renderer, psnake);
+            DRAW_GRID;
+
+            char score_text[32];
+            snprintf(score_text, sizeof(score_text), "Score: %d", score);
+            render_text(renderer, font, score_text, 10, 10);
         }
 
-        // 2. Check if snake hit itself
-        if (check_self_collision(psnake, nextX, nextY)) {
-            printf("Game Over! You bit yourself.\n");
-            game = 0; 
-            continue; 
-        }
-        
-        if(nextX == papple->x && nextY == papple->y)
-        {
-            grow_snake(&psnake, &direction);
-            reset_apple(psnake, papple);
-            score += 10;
-        }
-        else
-        {
-            move_snake(&psnake, &direction);
-        }
-        
-        APPLE(papple->x, papple->y);
-        draw_snake(renderer, psnake);
-        DRAW_GRID;
-        
-        snprintf(title_buffer, sizeof(title_buffer), "Snake Game - Score: %d", score);
-        SDL_SetWindowTitle(window, title_buffer);
-        
-        // --- NEW: Display what was just rendered
         SDL_RenderPresent(renderer);
-        
         SDL_Delay(200);
     }
     
     // Good practice: Clean up the renderer before quitting
+    TTF_CloseFont(font);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    TTF_Quit();
     SDL_Quit();
-    
     return 0;
 }
