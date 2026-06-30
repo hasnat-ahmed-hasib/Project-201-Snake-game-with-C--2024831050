@@ -332,7 +332,7 @@ int main(){
         } else {
             APPLE(papple->x, papple->y);
             draw_snake(renderer, psnake);
-            DRAW_GRID;
+            //DRAW_GRID;
 
             char score_text[32];
             snprintf(score_text, sizeof(score_text), "Score: %d", score);
