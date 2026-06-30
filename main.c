@@ -270,8 +270,8 @@ int main(){
             if(event.type == SDL_QUIT) game = 0;
 
             if(is_game_over) {
-                // If game is over, only listen for 'R'
-                if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r) {
+                // If game is over, only listen for '5'
+                if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_5) {
                     reset_game(&psnake, &score, &direction, papple);
                     is_game_over = 0;
                 }
@@ -328,7 +328,7 @@ int main(){
         }
         
         if(is_game_over) {
-            render_text(renderer, font, "GAME OVER - Press R to Restart", 80, 200);
+            render_text(renderer, font, "GAME OVER - Press 5 to Restart", 80, 200);
         } else {
             APPLE(papple->x, papple->y);
             draw_snake(renderer, psnake);
